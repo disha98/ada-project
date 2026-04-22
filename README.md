@@ -1,4 +1,4 @@
-# Project 2: Next Word Predictor
+# Next Word Predictor
 
 The goal of this project is to predict the most likely word following a given context. While modern approaches rely on Transformers, this project will explore using **classical ML models** (Random Forests, Logistic Regression) and simple neural networks (MLP) for this task.  
 
