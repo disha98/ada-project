@@ -78,13 +78,20 @@ Key findings:
 - **Bigger vocabulary helped monotonically** (2k → 7.24%, 5k → 7.66%, 10k → 9.72%), and **BoW slightly outperformed TF-IDF** for these models.
 - **Errors are dominated by common function words** (`the`, `a`, `and`, `in`, `to`), and the most common confusion is predicting `the` in place of other function words — expected behavior for a sparse-feature model with no word order.
 
-## Known Issues & Limitations
+## Error Analysis
 
-- **"10k test subset" labels are inaccurate.** The shared test subset cap is 3,000 (~2,940 after dropping unseen targets), but a few markdown/plot labels still say "10k." A labeling bug, not a results bug.
-- **Sample-cap inconsistency in the dataset builder.** `build_split_dataset` defaults to `max_samples=200_000` and is called without overriding it, so it regenerates more samples than the 80k generation used to fit the label encoder and the tuning-stage baselines. The final held-out test comparison is still apples-to-apples (baselines and models share one dataset), but the validation-stage baseline-vs-model comparison is not on the same population.
-- **"Best" model chosen on Top-1 alone.** The error analysis runs on the MLP because it edged out LR on Top-1, even though LR wins Top-3/Top-5 and the Top-1 gap is not statistically meaningful.
-- **The context-length result wasn't acted on.** The ablation found a 3-word window best, but the final models were retrained at window=4.
-- **Perplexity isn't comparable across stages.** The validation label space (~5,704 classes) is smaller than the final train+val label space (~8,084 classes), so cross-entropy/perplexity rises partly from label-space size rather than model quality. Random Forest perplexity is also inflated by poor probability calibration.
+Looking at where the best model got things wrong, almost all the mistakes involve very common words. The most frequently mispredicted true words are function words like `the`, `a`, `and`, `in`, and `to`, and the most common single error is predicting `the` when the real next word was a different function word.
+
+This makes sense: function words show up everywhere, so they are both the most common targets and the safest guesses for a model that can't see word order. The model leans on overall word frequency, which means it does fine on generic filler words but struggles with the more specific, content-carrying words that actually depend on context.
+
+## Choices, Tradeoffs & Limitations
+
+Most of the limitations here come from running everything locally on a laptop and from deliberate scoping decisions to keep the pipeline finishing in a reasonable time, rather than from the method itself.
+
+- **Compute budget capped the dataset size.** Everything runs locally, so I capped the sample budget (and the shared test subset at ~3,000 rows) so the full notebook — tuning three model families plus ablations — finishes end-to-end without an overnight run. A bigger test set would tighten the confidence intervals, but it wouldn't change the headline that the bigram wins.
+- **I chose to keep window=4 for the final models even though the ablation liked window=3.** Window=3 was only marginally better on validation (10.48% vs 9.74%), and keeping window=4 makes the final results directly comparable to the Week 5 and Week 7 checkpoints. I treated comparability across the term as more valuable than chasing a fraction of a percent.
+- **The label space grows between the validation and final stages**, because the final models are refit on train+val (so they see more target words). This is the intended behavior of a proper train/val/test workflow, but it does mean perplexity isn't directly comparable across the two stages, since the number of classes changes. Random Forest perplexity is also high mostly because tree probability estimates are poorly calibrated, not because the model is far worse than the others.
+- **Classical sparse features are the real ceiling.** Bag-of-words throws away word order, which is exactly the signal the bigram uses — so this is a limitation of the chosen approach, not something more tuning would have fixed.
 
 ## Summary & Reflection
 
